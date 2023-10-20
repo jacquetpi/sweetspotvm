@@ -1,0 +1,32 @@
+########################
+#  SchedulerGlobal     #
+########################
+#---- General
+SCG_DELAY=15 # Delay between two monitoring sessions in seconds
+SCG_URL="127.0.0.1"
+SCG_PORT="8099"
+SCG_NODE_URL_LIST="127.0.0.1:8100" # list of scheduler locals url separated by commas
+########################
+#  Schedulerlocal      #
+########################
+#---- General
+SCL_DELAY=15 # Delay between two monitoring sessions in seconds
+SCL_URL="127.0.0.1"
+SCL_PORT="8100"
+#---- Active cores
+SCL_ACT_MONITORING=3600 # Monitoring window duration for VMs when computing active cores in seconds
+SCL_ACT_LEARNING=300 # Aggregation window
+SCL_ACT_LEEWAY=5 # Value used to calibrate optimistic degree of predicted VM future usage peak (0 to disable). Higher SCL_DELAY should set higher Leeway value
+#---- QEMU
+QEMU_URL="qemu:///system"
+QEMU_LOC="/usr/bin/qemu-system-x86_64"
+QEMU_MACHINE="pc-q35-6.2"
+#---- Topology
+TOPO_EXCLUDE = "" # as list of cpuid to exclude (e.g. 0,1 )
+#--- Oversubscription
+OVSB_CRITICAL_SIZE=6 # oversub will not begin before this number of VM is reached
+#--- InfluxDB (not implemented yet)
+INFLUXDB_URL="http://localhost:8086"
+INFLUXDB_TOKEN="token_value"
+INFLUXDB_ORG="org"
+INFLUXDB_BUCKET="bucket"
