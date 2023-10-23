@@ -4,8 +4,8 @@ Intro
 
 ```bash
 apt-get update && apt-get install -y git python3 python3.venv
-git clone https://github.com/jacquetpi/vmpinning
-cd vmpinning/
+git clone https://github.com/jacquetpi/vcpupinning
+cd vcpupinning/
 python3 -m venv venv
 source venv/bin/activate
 python3 -m pip install -r requirements.txt
