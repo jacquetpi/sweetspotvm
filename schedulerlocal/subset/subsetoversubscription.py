@@ -134,7 +134,7 @@ class SubsetOversubscriptionStatic(SubsetOversubscription):
         return unused_cpu
 
 
-    def get_additional_res_count_required_for_vm(self, vm : DomainEntity):
+    def get_additional_res_count_required_for_quantity(self, quantity : float):
         """Return the number of additional physical resource required to deploy specified vm. 
         0 if no additional resources is required
         ----------
@@ -149,7 +149,7 @@ class SubsetOversubscriptionStatic(SubsetOversubscription):
         missing : int
             number of missing physical resources
         """
-        request    = self.subset.get_vm_allocation(vm) # Without oversubscription
+        request    = quantity                   # Without oversubscription
         capacity   = self.subset.get_capacity() # Without oversubscription
 
         # Compute new resources needed based on oversubcription ratio

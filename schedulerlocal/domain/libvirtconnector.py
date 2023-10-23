@@ -259,8 +259,6 @@ class LibvirtConnector(object):
         vm_xml = self.template_vm.replace('{name}', vm.get_name()).\
                 replace('{cpu}', str(vm.get_cpu())).\
                 replace('{mem}', str(vm.get_mem(as_kb=True))).\
-                replace('{oc_cpu}', str(vm.get_cpu_ratio())).\
-                replace('{oc_mem}', str(1.0)).\
                 replace('{loc}', self.loc).\
                 replace('{machine}', self.machine).\
                 replace('{qcow2}', vm.get_qcow2())

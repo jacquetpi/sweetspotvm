@@ -17,6 +17,8 @@ class Subset(object):
         List of physical resources
     consumer_list : list
         List of consumers
+    consumer_dict : dict
+        Resources id of consumer
 
     Public Methods
     -------
@@ -38,10 +40,13 @@ class Subset(object):
     def __init__(self, **kwargs):
         self.oversubscription = SubsetOversubscriptionStatic(subset=self, ratio=kwargs['oversubscription'])
         self.endpoint_pool = kwargs['endpoint_pool']
-        opt_attributes = ['res_list', 'consumer_list']
+        opt_attributes = ['res_list', 'consumer_list', 'consumer_dict']
         for opt_attribute in opt_attributes:
-            opt_val = kwargs[opt_attribute] if opt_attribute in kwargs else list()
+            opt_val = kwargs[opt_attribute] if opt_attribute in kwargs else None
             setattr(self, opt_attribute, opt_val)
+        if self.res_list == None: self.res_list = list()
+        if self.consumer_list == None: self.consumer_list = list()
+        if self.consumer_dict == None: self.consumer_dict = dict()
 
     def get_oversubscription_id(self):
         """Get subset id
@@ -158,7 +163,7 @@ class Subset(object):
         """
         return len(self.res_list)
 
-    def add_consumer(self, consumer):
+    def add_consumer(self, consumer, res_id):
         """Add a consumer to subset. Should not be called directly. Use deploy() instead
         ----------
 
@@ -167,8 +172,9 @@ class Subset(object):
         consumer : object
             The consumer to add
         """
-        if consumer in self.consumer_list: raise ValueError('Cannot add twice a consumer', consumer)
-        self.consumer_list.append(consumer)
+        if consumer not in self.consumer_list: self.consumer_list.append(consumer)
+        if consumer.get_name() not in self.consumer_dict: self.consumer_dict[consumer.get_name()] = list()
+        self.consumer_dict[consumer.get_name()].append(res_id)
 
     def remove_consumer(self, consumer):
         """Remove a consumer from subset
@@ -184,6 +190,7 @@ class Subset(object):
             else: print('Warning: trying to remove a non present consumer', consumer.get_name())
             return
         self.consumer_list.remove(consumer)
+        del self.consumer_dict[consumer.get_name()]
 
     def count_consumer(self):
         """Count consumers in subset
@@ -205,9 +212,9 @@ class Subset(object):
         consumers : list
             consumers list
         """
-        return self.consumer_list
+        return list(self.consumer_list)
 
-    def get_additional_res_count_required_for_vm(self, vm : DomainEntity):
+    def get_additional_res_count_required_for_quantity(self, quantity : float):
         """Return the number of additional resource required to deploy specified vm. 0 if no additional resources is required
         ----------
 
@@ -221,7 +228,7 @@ class Subset(object):
         missing : int
             number of missing physical resources
         """
-        return self.oversubscription.get_additional_res_count_required_for_vm(vm)
+        return self.oversubscription.get_additional_res_count_required_for_quantity(quantity)
 
     def unused_resources_count(self):
         """Return the number of resource unused
@@ -249,25 +256,9 @@ class Subset(object):
             Sum of resources requested
         """
         allocation = 0
-        for consumer in self.consumer_list: allocation+= self.get_vm_allocation(consumer)
+        for resources in self.consumer_dict.values(): 
+            allocation += len(resources)
         return allocation
-
-    def get_vm_allocation(self, vm : DomainEntity):
-        """Return allocation of a given VM. Resource dependant. Must be reimplemented
-        Allocation : number of resources requested, without oversubscription consideration
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        allocation : int
-            Number of resources requested by the VM
-        """
-        raise NotImplementedError()
 
     def get_max_consumer_allocation(self):
         """Return the highest allocation between consumers
@@ -280,8 +271,8 @@ class Subset(object):
             Number of resources requested by the VM
         """
         max_allocation = 0
-        for consumer in self.consumer_list: 
-            if max_allocation < self.get_vm_allocation(consumer): max_allocation = self.get_vm_allocation(consumer)
+        for resources in self.consumer_dict.values(): 
+            if max_allocation < len(resources): max_allocation = len(resources)
         return max_allocation
 
     def get_capacity(self):
@@ -357,15 +348,15 @@ class Subset(object):
         """
         raise NotImplementedError()
 
-    def deploy(self, vm : DomainEntity):
+    def deploy(self, vm : DomainEntity, res_id : int, res_quantity : float):
         """Deploy a VM on resources. Resource dependant. Must be reimplemented with a super call
         Should adapt the DomainEntity object as required before the subsetManager applies changes with connector
         """
         available_oversubscribed = self.oversubscription.get_available(with_new_vm=True)
-        if available_oversubscribed < self.get_vm_allocation(vm): 
-            print('Warning: Not enough resources available to deploy', vm.get_name(), 'on res', self.get_res_name(), 'for request', self.get_vm_allocation(vm))
+        if available_oversubscribed < res_quantity: 
+            print('Warning: Not enough resources available to deploy', vm.get_name(), 'on res', self.get_res_name(), 'for request', res_quantity)
             return False
-        self.add_consumer(vm)
+        self.add_consumer(consumer=vm, res_id=res_id)
         return True
 
     def status(self):
@@ -629,22 +620,6 @@ class CpuSubset(Subset):
         """
         return 'cpu'
 
-    def get_vm_allocation(self, vm : DomainEntity):
-        """Return CPU allocation of a given VM without oversubscription consideration
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        allocation : int
-            Number of resources requested by the VM
-        """
-        return vm.get_cpu()
-
     def get_capacity(self):
         """Return subset CPU capacity.
         Capacity : number of physical CPU which can be used by VM
@@ -666,7 +641,6 @@ class CpuSubset(Subset):
         """
         return self.cpu_explorer.get_usage_of(self.get_res())
 
-
     def get_current_consumer_usage(self, consumer : DomainEntity):
         """Get current CPU usage of a single consumer
         
@@ -682,7 +656,7 @@ class CpuSubset(Subset):
         """
         return self.connector.get_usage_cpu(consumer)
 
-    def deploy(self, vm : DomainEntity):
+    def deploy(self, vm : DomainEntity, res_id : int, res_quantity : float):
         """Deploy a VM on CPU subset
         Should adapt the DomainEntity object as required before the subsetManager applies changes with connector
         ----------
@@ -692,7 +666,7 @@ class CpuSubset(Subset):
         vm : DomainEntity
             The VM to consider
         """
-        success = super().deploy(vm) 
+        success = super().deploy(vm, res_id, res_quantity)
         # Update vm pinning
         self.sync_pinning()
         # Reset CPU time used to compute usage
@@ -705,8 +679,11 @@ class CpuSubset(Subset):
         """
         template = self.connector.build_cpu_pinning(cpu_list=self.get_pinning_res(), host_config=self.cpu_count)
         for consumer in self.consumer_list:
-            consumer.set_cpu_pin(template)
+            for res_id in self.get_consumer_resources_id(consumer): consumer.set_cpu_pin(resource_id=res_id, template_pin=template)
             if consumer.is_deployed() and not self.offline: self.connector.update_cpu_pinning(vm=consumer)
+
+    def get_consumer_resources_id(self, consumer : DomainEntity):
+        return self.consumer_dict[consumer.get_name()]
 
     def get_pinning_res(self):
         """Get the resources to use for synchronisation. May be reimplemented
@@ -898,17 +875,6 @@ class MemSubset(Subset):
         """
         return 'mem'
 
-    def get_vm_allocation(self, vm : DomainEntity):
-        """Return Memory allocation of a given VM without oversubscription consideration
-        ----------
-
-        Returns
-        -------
-        allocation : int
-            Number of resources requested by the VM
-        """
-        return vm.get_mem(as_kb=False) # in MB
-
     def get_capacity(self):
         """Return subset memory capacity.
         Capacity : Amount of physical memory which can be used by VM
@@ -948,7 +914,7 @@ class MemSubset(Subset):
         """
         return self.connector.get_usage_mem(consumer) 
 
-    def deploy(self, vm : DomainEntity):
+    def deploy(self, vm : DomainEntity, res_id : int, res_quantity : float):
         """Deploy a VM on memory subset
         Should adapt the DomainEntity object as required before the subsetManager applies changes with connector
         ----------
@@ -958,7 +924,7 @@ class MemSubset(Subset):
         vm : DomainEntity
             The VM to consider
         """
-        success = super().deploy(vm)
+        success = super().deploy(vm, res_id, res_quantity)
         # Nothing special to do on memory with libvirt
         return success
 

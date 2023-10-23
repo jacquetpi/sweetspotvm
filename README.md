@@ -22,7 +22,7 @@ python3 -m schedulerlocal --debug=1
 
 Order the creation of a vm
 ```bash
-curl 'http://127.0.0.1:8099/deploy?name=example&cpu=2&mem=2&oc=2&qcow2=/var/lib/libvirt/images/hello.qcow2'
+curl 'http://127.0.0.1:8099/deploy?name=example&cpu=2&mem=2&qcow2=/var/lib/libvirt/images/hello.qcow2'
 ```
 
 Order the deletion of a vm

@@ -1,7 +1,7 @@
 <domain type='kvm'>
   <name>{name}</name>
   <metadata>
-    <sched:ratio xmlns:sched="1.0.0" cpu="{oc_cpu}" mem="{oc_mem}" disk="1.0" network="1.0"/>
+    <sched:ratio xmlns:sched="1.0.0" cpu="1.0" mem="1.0" disk="1.0" network="1.0"/>
   </metadata>
   <memory unit='KiB'>{mem}</memory>
   <currentMemory unit='KiB'>{mem}</currentMemory>

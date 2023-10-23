@@ -2,6 +2,7 @@ from schedulerlocal.subset.subset import SubsetCollection, Subset, CpuSubset, Cp
 from schedulerlocal.domain.domainentity import DomainEntity
 from schedulerlocal.node.cpuexplorer import CpuExplorer
 from schedulerlocal.node.memoryexplorer import MemoryExplorer
+from schedulerlocal.subset.templateoversubscription import *
 
 class SubsetManager(object):
     """
@@ -30,7 +31,7 @@ class SubsetManager(object):
         """Deploy a VM to the appropriate subset
         ----------
 
-        Parameters
+        ParametersCpu
         ----------
         vm : DomainEntity
             The VM to consider
@@ -40,9 +41,15 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        if self.collection.contains_subset(self.get_appropriate_id(vm)):
-            return self.__try_to_deploy_on_existing_subset(vm)
-        return self.__try_to_deploy_on_new_subset(vm)
+        for res_id, (subset_id, res_quantity) in enumerate(self.template_manager.get_subsets_for(vm).items()):
+            success = self.__deploy_internal(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
+            if not success: break
+        return success
+
+    def __deploy_internal(self, vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
+        if self.collection.contains_subset(subset_id):
+            return self.__try_to_deploy_on_existing_subset(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
+        return self.__try_to_deploy_on_new_subset(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
 
     def remove(self, vm : DomainEntity):
         """Remove a VM
@@ -58,12 +65,12 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        subset_id = self.get_appropriate_id(vm)
-        if not self.collection.contains_subset(subset_id): return False
-        subset = self.collection.get_subset(subset_id)
-        subset.remove_consumer(vm)
-        self.shrink_subset(subset)
-        return True
+        success = True
+        for subset in self.collection.get_subsets():
+            if subset.has_vm(vm): 
+                success = success and subset.remove_consumer(vm)
+                self.shrink_subset(subset)
+        return subset
 
     def has_vm(self, vm : DomainEntity):
         """Test if a VM is present in a subset
@@ -97,7 +104,7 @@ class SubsetManager(object):
         """
         return self.collection.get_vm_by_name(name)
 
-    def __try_to_deploy_on_existing_subset(self,  vm : DomainEntity):
+    def __try_to_deploy_on_existing_subset(self,  vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
         """Try to deploy a VM to an existing subset by extending it if required 
         ----------
 
@@ -111,19 +118,19 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        targeted_subset = self.collection.get_subset(self.get_appropriate_id(vm))
+        targeted_subset = self.collection.get_subset(subset_id)
         # Check if subset has available space
-        additional_res_required = targeted_subset.get_additional_res_count_required_for_vm(vm)
+        additional_res_required = targeted_subset.get_additional_res_count_required_for_quantity(quantity=res_quantity)
         if additional_res_required <= 0:
             # No missing resources, can deploy the VM right away
-            return targeted_subset.deploy(vm)
+            return targeted_subset.deploy(vm, res_id, res_quantity)
         else:
             # Missing resources on subset, try to allocate more
             extended = self.try_to_extend_subset(targeted_subset, additional_res_required)
             if not extended: return False 
-            return targeted_subset.deploy(vm) 
+            return targeted_subset.deploy(vm, res_id, res_quantity) 
 
-    def __try_to_deploy_on_new_subset(self, vm : DomainEntity):
+    def __try_to_deploy_on_new_subset(self,  vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
         """Try to deploy a VM to a new subset
         ----------
 
@@ -137,11 +144,10 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        oversubscription = self.get_appropriate_id(vm)
-        subset = self.try_to_create_subset(initial_capacity=self.get_request(vm), oversubscription=oversubscription)
+        subset = self.try_to_create_subset(initial_capacity=res_quantity, oversubscription=subset_id)
         if subset == None: return False
-        self.collection.add_subset(oversubscription, subset)
-        return subset.deploy(vm)
+        self.collection.add_subset(subset_id, subset)
+        return subset.deploy(vm, res_id, res_quantity) 
 
     def try_to_extend_subset(self,  subset : Subset, amount : int):
         """Try to extend subset resource by the specified amount. Resource dependant. Must be reimplemented
@@ -178,39 +184,6 @@ class SubsetManager(object):
             Return Subset created. None if failed. Resource dependant. Must be reimplemented
         """
         raise NotImplementedError()
-
-    def get_appropriate_id(self, vm : DomainEntity):
-        """For a given VM, a subset ID typically corresponds to its premium policy. Must be reimplemented
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        subset_id : float
-            premium policy
-        """
-        raise NotImplementedError()
-
-    def get_request(self, vm : DomainEntity):
-        """For a given VM, return its resource request. Resource dependant. Must be reimplemented
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        request : int
-            VM resource request
-        """
-        raise NotImplementedError()
-
 
     def shrink(self):
         """Reduce subset capacity based on current allocation
@@ -337,6 +310,7 @@ class CpuSubsetManager(SubsetManager):
             if req_attribute not in kwargs: raise ValueError('Missing required argument', req_attributes)
             setattr(self, req_attribute, kwargs[req_attribute])
         self.cpu_explorer = CpuExplorer()
+        self.template_manager = TemplateOversubscriptionCpu()
         super().__init__(**kwargs)
 
     def try_to_create_subset(self,  initial_capacity : int, oversubscription : float, subset_type : type = CpuSubset):
@@ -504,22 +478,6 @@ class CpuSubsetManager(SubsetManager):
         for count in range(unused): subset.remove_res(res_list[last_index-count])
         subset.sync_pinning()
 
-    def get_appropriate_id(self, vm : DomainEntity):
-        """For a given VM, get its appropriate subset ID (corresponds to its premium policy)
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        id : int
-            Its oversubscription ratio as subset ID
-        """
-        return vm.get_cpu_ratio()
-
     def get_current_resources_usage(self):
         """Get usage of physical CPU resources
 
@@ -529,22 +487,6 @@ class CpuSubsetManager(SubsetManager):
             Percentage [0:1]
         """
         return self.cpu_explorer.get_usage_global()
-
-    def get_request(self, vm : DomainEntity):
-        """For a given VM, return its CPU request
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        cpu : int
-            CPU request of given VM
-        """
-        return vm.get_cpu()
 
     def get_res_name(self):
         """Get resource name managed by ManagerSubset
@@ -638,6 +580,7 @@ class MemSubsetManager(SubsetManager):
             if req_attribute not in kwargs: raise ValueError('Missing required argument', req_attributes)
             setattr(self, req_attribute, kwargs[req_attribute])
         self.mem_explorer = MemoryExplorer()
+        self.template_manager = TemplateOversubscriptionMem()
         super().__init__(**kwargs)
 
     def try_to_create_subset(self,  initial_capacity : int, oversubscription : float):
@@ -760,22 +703,6 @@ class MemSubsetManager(SubsetManager):
         subset.remove_res(initial_tuple)
         if unused < initial_tuple[1]: subset.add_res((initial_tuple[0], initial_tuple[1]-unused))
 
-    def get_appropriate_id(self, vm : DomainEntity):
-        """For a given VM, get its appropriate subset ID (corresponds to its premium policy)
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        id : int
-            Its oversubscription ratio as subset ID
-        """
-        return 1 # Memory is out of scope of this paper
-
     def get_current_resources_usage(self):
         """Get usage of physical Memory resources
 
@@ -785,22 +712,6 @@ class MemSubsetManager(SubsetManager):
             Percentage [0:1]
         """
         return self.mem_explorer.get_usage_global()
-
-    def get_request(self, vm : DomainEntity):
-        """For a given VM, return its memory request
-        ----------
-
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        mem : int
-            Memory request of given VM
-        """
-        return vm.get_mem(as_kb=False) # in MB
 
     def get_res_name(self):
         """Get resource name managed by ManagerSubset
