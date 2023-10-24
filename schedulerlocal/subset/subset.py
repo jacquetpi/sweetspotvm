@@ -245,11 +245,6 @@ class Subset(object):
         """Return allocation of subset (number of resources requested without oversubscription consideration)
         ----------
 
-        Parameters
-        ----------
-        vm : DomainEntity
-            The VM to consider
-
         Returns
         -------
         allocation : int
@@ -673,11 +668,17 @@ class CpuSubset(Subset):
         for server_cpu in self.res_list: server_cpu.get_hist().clear_time() # TODO: needed?
         return success
 
-    def sync_pinning(self):
+    def sync_pinning(self, cpu_list : list = None):
         """Synchronize VM pinning to CPU according to the current ServerCPU list
+
+        Parameters
+        ----------
+        cpu_list : ServerCPU list (optional)
+            If specific cores must be used, use this argument. Otherwise, get_pinning_res() method will be called
         ----------
         """
-        template = self.connector.build_cpu_pinning(cpu_list=self.get_pinning_res(), host_config=self.cpu_count)
+        if cpu_list == None: cpu_list = self.get_pinning_res()
+        template = self.connector.build_cpu_pinning(cpu_list=cpu_list, host_config=self.cpu_count)
         for consumer in self.consumer_list:
             for res_id in self.get_consumer_resources_id(consumer): consumer.set_cpu_pin(resource_id=res_id, template_pin=template)
             if consumer.is_deployed() and not self.offline: self.connector.update_cpu_pinning(vm=consumer)
@@ -888,6 +889,19 @@ class MemSubset(Subset):
         for bound_inferior, bound_superior in self.res_list:
             capacity += (bound_superior-bound_inferior) 
         return capacity
+
+    def get_allocation(self):
+        """Return allocation of Memsubset (number of resources requested without oversubscription consideration)
+        ----------
+
+        Returns
+        -------
+        allocation : int
+            Sum of resources requested
+        """
+        allocation = 0
+        for consumer in self.consumer_list: allocation+= consumer.get_mem(as_kb=False) # in MB
+        return allocation
 
     def get_current_resources_usage(self):
         """Get usage of physical Memory resources
