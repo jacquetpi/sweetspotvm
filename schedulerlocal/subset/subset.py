@@ -255,6 +255,23 @@ class Subset(object):
             allocation += len(resources)
         return allocation
 
+    def get_vm_allocation(self, vm : DomainEntity):
+        """Return allocation of a given VM. Resource dependant. Must be reimplemented
+        Allocation : number of resources requested, without oversubscription consideration
+        ----------
+
+        Parameters
+        ----------
+        vm : DomainEntity
+            The VM to consider
+
+        Returns
+        -------
+        allocation : int
+            Number of resources requested by the VM
+        """
+        raise NotImplementedError()
+
     def get_max_consumer_allocation(self):
         """Return the highest allocation between consumers
         Allocation : number of resources requested, without oversubscription consideration
@@ -615,6 +632,22 @@ class CpuSubset(Subset):
         """
         return 'cpu'
 
+    def get_vm_allocation(self, vm : DomainEntity):
+        """Return CPU allocation of a given VM without oversubscription consideration
+        ----------
+
+        Parameters
+        ----------
+        vm : DomainEntity
+            The VM to consider
+
+        Returns
+        -------
+        allocation : int
+            Number of resources requested by the VM
+        """
+        return vm.get_cpu()
+
     def get_capacity(self):
         """Return subset CPU capacity.
         Capacity : number of physical CPU which can be used by VM
@@ -875,6 +908,17 @@ class MemSubset(Subset):
             resource name
         """
         return 'mem'
+
+    def get_vm_allocation(self, vm : DomainEntity):
+        """Return Memory allocation of a given VM without oversubscription consideration
+        ----------
+
+        Returns
+        -------
+        allocation : int
+            Number of resources requested by the VM
+        """
+        return vm.get_mem(as_kb=False) # in MB
 
     def get_capacity(self):
         """Return subset memory capacity.
