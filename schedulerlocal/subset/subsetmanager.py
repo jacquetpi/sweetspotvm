@@ -71,7 +71,7 @@ class SubsetManager(object):
             if subset.has_vm(vm): 
                 success = success and subset.remove_consumer(vm)
                 self.shrink_subset(subset)
-        return subset
+        return success
 
     def has_vm(self, vm : DomainEntity):
         """Test if a VM is present in a subset

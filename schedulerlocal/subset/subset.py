@@ -112,7 +112,7 @@ class Subset(object):
             # Search by uuid if available
             if (consumer.get_uuid() == None) and (consumer.get_name() == vm.get_name()): 
                 if consumer.is_being_destroyed():
-                    print(warning_message + ' ' + consumer.get_name() + ' ' + consumer.get_uuid())
+                    print(warning_message + ' ' + consumer.get_name() + ' no uuid')
                     return False
                 return True
             # Otherwise search by name
