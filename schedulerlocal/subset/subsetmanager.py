@@ -66,12 +66,11 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        success = True
         for subset in self.collection.get_subsets():
             if subset.has_vm(vm, ignore_destroyed=False): # As we look for a VM being in the destroy process
-                success = success and subset.remove_consumer(vm)
+                subset.remove_consumer(vm)
                 self.shrink_subset(subset)
-        return success
+        return True
 
     def has_vm(self, vm : DomainEntity):
         """Test if a VM is present in a subset
