@@ -68,7 +68,7 @@ class SubsetManager(object):
         """
         success = True
         for subset in self.collection.get_subsets():
-            if subset.has_vm(vm): 
+            if subset.has_vm(vm, ignore_destroyed= False): # As we look for a VM being in the destroy process
                 success = success and subset.remove_consumer(vm)
                 self.shrink_subset(subset)
         return success

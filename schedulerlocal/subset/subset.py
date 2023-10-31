@@ -93,7 +93,7 @@ class Subset(object):
         """
         return self.res_list
 
-    def has_vm(self, vm : DomainEntity):
+    def has_vm(self, vm : DomainEntity, ignore_destroyed : bool = True):
         """Test if a vm is present in subset
         ----------
 
@@ -111,13 +111,13 @@ class Subset(object):
         for consumer in self.consumer_list:
             # Search by uuid if available
             if (consumer.get_uuid() == None) and (consumer.get_name() == vm.get_name()): 
-                if consumer.is_being_destroyed():
+                if ignore_destroyed and consumer.is_being_destroyed():
                     print(warning_message + ' ' + consumer.get_name() + ' no uuid')
                     return False
                 return True
             # Otherwise search by name
             elif (consumer.get_uuid() != None) and (consumer.get_uuid() == vm.get_uuid()):
-                if consumer.is_being_destroyed():
+                if ignore_destroyed and consumer.is_being_destroyed():
                     print(warning_message + ' ' + consumer.get_name() + ' ' + consumer.get_uuid())
                     return False
                 return True
