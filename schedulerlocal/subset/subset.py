@@ -203,6 +203,17 @@ class Subset(object):
         """
         return len(self.consumer_list)
 
+    def count_unique_consumer(self):
+        """Count unique consumers in subset
+        ----------
+
+        Returns
+        -------
+        count : int
+            number of unique consumers
+        """
+        return len(set(self.consumer_list))
+
     def get_consumers(self):
         """Get consumers list
         ----------

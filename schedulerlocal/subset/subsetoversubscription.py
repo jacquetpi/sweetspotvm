@@ -212,7 +212,7 @@ class SubsetOversubscriptionStatic(SubsetOversubscription):
         answer : bool
             True/False
         """
-        count = self.subset.count_consumer()
+        count = self.subset.count_unique_consumer()
         if with_new_vm: count+=1
         return count >= self.critical_size
 

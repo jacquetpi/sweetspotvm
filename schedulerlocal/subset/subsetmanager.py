@@ -42,7 +42,7 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        for res_id, (subset_id, res_quantity) in enumerate(self.template_manager.get_subsets_for(vm).items()):
+        for res_id, (subset_id, res_quantity) in enumerate(self.template_manager.get_subsets_for(vm)):
             success = self.__deploy_internal(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
             if not success: break
         return success
