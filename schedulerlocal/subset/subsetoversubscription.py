@@ -134,7 +134,7 @@ class SubsetOversubscriptionStatic(SubsetOversubscription):
         return unused_cpu
 
 
-    def get_additional_res_count_required_for_quantity(self, quantity : float):
+    def get_additional_res_count_required_for_quantity(self, vm : DomainEntity, quantity : float):
         """Return the number of additional physical resource required to deploy specified vm. 
         0 if no additional resources is required
         ----------
@@ -142,7 +142,9 @@ class SubsetOversubscriptionStatic(SubsetOversubscription):
         Parameters
         ----------
         vm : DomainEntity
-            The VM to consider
+            The VM being deployed
+        quantity : float
+            Quantity of resources on this oversubscription subset
 
         Returns
         -------
@@ -161,8 +163,9 @@ class SubsetOversubscriptionStatic(SubsetOversubscription):
 
         # Check if new_capacity is enough to fullfil VM request without oversubscribing it with itself
         # E.g. a 32vCPU request should be in a pool with 32 physical CPU, no matter what others VM are in it.
-        if new_capacity < request:
-            missing_physical+= ceil(request-new_capacity)
+        minimal_capacity = self.subset.get_max_consumer_allocation(additional_vm=vm, additional_vm_quantity=quantity)
+        if new_capacity < minimal_capacity:
+            missing_physical+= ceil(minimal_capacity-new_capacity)
 
         return missing_physical
 

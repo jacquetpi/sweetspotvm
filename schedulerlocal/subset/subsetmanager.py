@@ -120,7 +120,7 @@ class SubsetManager(object):
         """
         targeted_subset = self.collection.get_subset(subset_id)
         # Check if subset has available space
-        additional_res_required = targeted_subset.get_additional_res_count_required_for_quantity(quantity=res_quantity)
+        additional_res_required = targeted_subset.get_additional_res_count_required_for_quantity(vm=vm,quantity=res_quantity)
         if additional_res_required <= 0:
             # No missing resources, can deploy the VM right away
             return targeted_subset.deploy(vm, res_id, res_quantity)

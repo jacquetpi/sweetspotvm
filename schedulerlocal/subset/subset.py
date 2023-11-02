@@ -212,7 +212,7 @@ class Subset(object):
         count : int
             number of unique consumers
         """
-        return len(set(self.consumer_list))
+        return len(set([consumer.get_name() for consumer in self.consumer_list]))
 
     def get_consumers(self):
         """Get consumers list
@@ -225,21 +225,23 @@ class Subset(object):
         """
         return list(self.consumer_list)
 
-    def get_additional_res_count_required_for_quantity(self, quantity : float):
+    def get_additional_res_count_required_for_quantity(self, vm : DomainEntity, quantity : float):
         """Return the number of additional resource required to deploy specified vm. 0 if no additional resources is required
         ----------
 
         Parameters
         ----------
         vm : DomainEntity
-            The VM to consider
+            The VM being deployed
+        quantity : float
+            Quantity of resources on this oversubscription subset
 
         Returns
         -------
         missing : int
             number of missing physical resources
         """
-        return self.oversubscription.get_additional_res_count_required_for_quantity(quantity)
+        return self.oversubscription.get_additional_res_count_required_for_quantity(vm=vm,quantity=quantity)
 
     def unused_resources_count(self):
         """Return the number of resource unused
@@ -283,19 +285,29 @@ class Subset(object):
         """
         raise NotImplementedError()
 
-    def get_max_consumer_allocation(self):
+    def get_max_consumer_allocation(self, additional_vm : DomainEntity = None, additional_vm_quantity : float = None):
         """Return the highest allocation between consumers
         Allocation : number of resources requested, without oversubscription consideration
         ----------
 
+        Parameters
+        ----------
+        additional_vm : DomainEntity (optional)
+            The VM being deployed
+        additional_vm_quantity : float (optional)
+            Quantity of resources on this oversubscription subset
+
         Returns
         -------
         allocation : int
-            Number of resources requested by the VM
+            Number of resources requested by the largest VM
         """
         max_allocation = 0
-        for resources in self.consumer_dict.values(): 
-            if max_allocation < len(resources): max_allocation = len(resources)
+        if (additional_vm != None and additional_vm_quantity !=None) and additional_vm.get_name() not in self.consumer_dict: max_allocation = additional_vm_quantity
+        for vm_name, resources in self.consumer_dict.items(): 
+            allocation = len(resources)
+            if (additional_vm_quantity != None) and (vm_name == additional_vm.get_name()): allocation+=additional_vm_quantity
+            if max_allocation < allocation: max_allocation = allocation
         return max_allocation
 
     def get_capacity(self):
