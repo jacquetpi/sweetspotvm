@@ -185,12 +185,17 @@ class ServerCpuSet(object):
 
     def __init__(self, **kwargs):
         self.numa_distances = kwargs['numa_distances'] if 'numa_distances' in kwargs else None
-        self.cpu_list = kwargs['cpu_list'] if 'cpu_list' in kwargs else list()
         self.distances = kwargs['distances'] if 'distances' in kwargs else dict()
         self.host_count = kwargs['host_count'] if 'host_count' in kwargs else None
+        self.cpu_per_numa = dict()
+        if 'cpu_list'not in kwargs: 
+            self.cpu_list = list()
+        else:
+            self.cpu_list = kwargs['cpu_list']
+            for cpu in kwargs['cpu_list']: self.add_numa_cpu(cpu)
 
     def add_cpu(self, cpu : ServerCpu):
-        """Add a ServerCpu object
+        """Add a ServerCpu object to Cpu list
         ----------
 
         Parameters
@@ -199,6 +204,19 @@ class ServerCpuSet(object):
             cpu to add
         """
         self.cpu_list.append(cpu)
+        self.add_numa_cpu(cpu)
+
+    def add_numa_cpu(self, cpu : ServerCpu):
+        """Add a ServerCpu object to per numa node list
+        ----------
+
+        Parameters
+        ----------
+        cpu : ServerCpu
+            cpu to add
+        """
+        if cpu.get_numa_node() not in self.cpu_per_numa: self.cpu_per_numa[cpu.get_numa_node()] = list()
+        self.cpu_per_numa[cpu.get_numa_node()].append(cpu)
 
     def build_distances(self):
         """For each CPU tuple possible in the cpuset, compute the distance based on Cache Level, siblings and numa distances
@@ -237,7 +255,10 @@ class ServerCpuSet(object):
         self.distances = {int(k):{int(kprime):vprime for kprime,vprime in v.items()} for k,v in raw_object['distances'].items()}
         self.cpu_list = list()
         self.host_count = raw_object['host_count']
-        for raw_cpu in raw_object['cpu_list']: self.cpu_list.append(ServerCpu(**raw_cpu))
+        for raw_cpu in raw_object['cpu_list']:
+            server_cpu = ServerCpu(**raw_cpu)
+            self.cpu_list.append(server_cpu)
+            self.add_numa_cpu(server_cpu)
         return self
 
     def get_host_count(self):
@@ -251,6 +272,39 @@ class ServerCpuSet(object):
         ----------
         """
         return self.cpu_list
+
+    def get_numa_cpu_list(self, numa_id):
+        """Return CPU list from numa node
+        ----------
+
+        Parameters
+        ----------
+        numa_id : int
+            Numa node identifier
+
+        Returns
+        -------
+        cpu_list  : list
+            List of CPUs
+        """
+        if numa_id not in self.cpu_per_numa: return 0
+        return self.cpu_per_numa[numa_id]
+
+    def get_numa_keys(self):
+        """Return numa node ids
+        ----------
+
+        Parameters
+        ----------
+        numa_id : int
+            Numa node identifier
+
+        Returns
+        -------
+        numa_list  : list
+            List of numa node ids
+        """
+        return list(self.cpu_per_numa.keys())
 
     def set_cpu_list(self, cpu_list : list):
         """Set CPU list
@@ -287,6 +341,23 @@ class ServerCpuSet(object):
             Count of CPU
         """
         return len(self.get_cpu_list())
+
+    def get_numa_allowed(self, numa_id):
+        """Return usable CPU count for VMs in specified numa node
+        ----------
+
+        Parameters
+        ----------
+        numa_id : int
+            Numa node identifier
+
+        Returns
+        -------
+        count : CPU
+            Count of CPU
+        """
+        if numa_id not in self.cpu_per_numa: return 0
+        return len(self.cpu_per_numa[numa_id])    
 
     def get_distance_between_cpus(self, cpu0 : ServerCpu, cpu1 : ServerCpu):
         """Retrieve the distance between two ServerCpu objects
