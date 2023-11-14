@@ -605,9 +605,9 @@ class SubsetCollection(object):
             List of subset having VM which left without passing by our scheduler methods
         """
         clean_needed_list = list()
-        # for subset in self.subset_dict.values():
-        #     __, __, clean_needed = subset.update_monitoring(timestamp=timestamp) 
-        #     if clean_needed: clean_needed_list.append(subset)
+        for subset in self.subset_dict.values():
+            __, __, clean_needed = subset.update_monitoring(timestamp=timestamp) 
+            if clean_needed: clean_needed_list.append(subset)
         return clean_needed_list
 
     def get_consumers(self):
