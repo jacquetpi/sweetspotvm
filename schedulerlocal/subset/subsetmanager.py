@@ -632,7 +632,7 @@ class CpuSubsetManager(SubsetManager):
         """
         return 'cpu'
 
-    def get_capacity(self, numa_id : int):
+    def get_capacity(self, numa_id : int = None):
         """Get CPU capacity managed by ManagerSubset on numa node
         ----------
 
@@ -646,6 +646,8 @@ class CpuSubsetManager(SubsetManager):
         capacity : float
             capacity as float
         """
+        if numa_id == None:
+            return self.cpuset.get_allowed()
         return self.cpuset.get_numa_allowed(numa_id=numa_id)
 
     def get_available_res_count(self, numa_id : int):
@@ -877,7 +879,7 @@ class MemSubsetManager(SubsetManager):
         """
         return 'mem'
 
-    def get_capacity(self, numa_id : int):
+    def get_capacity(self, numa_id : int = None):
         """Get Memory capacity managed by ManagerSubset on numa node
         ----------
 
@@ -891,6 +893,8 @@ class MemSubsetManager(SubsetManager):
         capacity : float
             capacity as float
         """
+        if numa_id == None:
+            return self.memset.get_allowed()
         return self.memset.get_numa_allowed(numa_id)
 
     def get_available_res_count(self, numa_id : int):
