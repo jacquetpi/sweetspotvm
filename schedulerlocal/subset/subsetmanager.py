@@ -513,8 +513,17 @@ class CpuSubsetManager(SubsetManager):
         """
         cpuid_dict = {cpu.get_cpu_id():cpu for cpu in self.cpuset.get_numa_cpu_list(numa_id=numa_id)}
         available_list = self.__get_available_cpus(numa_id=numa_id)
-        allocated_list = subset.get_res()
-        available_cpu_weighted = self.__get_available_cpus_with_weight(from_list=available_list, to_list=allocated_list, exclude_max=False)
+        available_cpu_weighted = self.__get_available_cpus_with_weight(from_list=available_list, to_list=subset.get_res(), exclude_max=False)
+
+        # Now, we penalize cores that are closer to others subset
+        penalty = max(available_cpu_weighted.values()) if available_cpu_weighted else 0
+        for other_subset in self.collections[numa_id].get_subsets():
+            if other_subset.get_oversubscription_id() == subset.get_oversubscription_id(): continue
+
+            other_cpu_weighted = self.__get_available_cpus_with_weight(from_list=available_list, to_list=other_subset.get_res(), exclude_max=False)
+            for cpuid in available_cpu_weighted.keys():
+                if other_cpu_weighted[cpuid] < available_cpu_weighted[cpuid]: available_cpu_weighted[cpuid] += penalty
+        
         # Reorder distances from the closest one to the farthest one
         return [cpuid_dict[cpuid] for cpuid, v in sorted(available_cpu_weighted.items(), key=lambda item: item[1])]
 
