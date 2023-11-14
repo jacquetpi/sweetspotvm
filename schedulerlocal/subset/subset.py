@@ -40,7 +40,7 @@ class Subset(object):
     def __init__(self, **kwargs):
         self.oversubscription = SubsetOversubscriptionStatic(subset=self, ratio=kwargs['oversubscription'])
         self.endpoint_pool = kwargs['endpoint_pool']
-        opt_attributes = ['res_list', 'consumer_list', 'consumer_dict']
+        opt_attributes = ['res_list', 'consumer_list', 'consumer_dict', 'numa_id']
         for opt_attribute in opt_attributes:
             opt_val = kwargs[opt_attribute] if opt_attribute in kwargs else None
             setattr(self, opt_attribute, opt_val)
@@ -57,7 +57,7 @@ class Subset(object):
         id : float
             Oversubscription as ID
         """
-        return self.oversubscription.get_id()
+        return str(self.numa_id) + ":" + str(self.oversubscription.get_id())
 
     def add_res(self, res):
         """Add a resource to subset

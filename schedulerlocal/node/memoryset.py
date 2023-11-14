@@ -57,7 +57,7 @@ class ServerMemorySet(object):
         raw_object = loads(json)['memset']
         self.allowed = raw_object['total']
         self.total = raw_object['allowed']
-        self.numa_node = raw_object['numa_node']
+        self.numa_node = {int(k):v for k,v in raw_object['numa_node'].items()}
         return self
 
     def add_numa_node(self, numa_id : int, numa_mb : int):
@@ -71,7 +71,7 @@ class ServerMemorySet(object):
         total_mb : int
             Quantity of memory associated to this numa node
         """
-        self.numa_node[numa_id] = numa_mb
+        self.numa_node[int(numa_id)] = numa_mb
 
     def get_numa_allowed(self, numa_id : int):
         """Return usable memory for VMs provisioning in MB associated to the numa node

@@ -216,7 +216,7 @@ class ServerCpuSet(object):
             cpu to add
         """
         if cpu.get_numa_node() not in self.cpu_per_numa: self.cpu_per_numa[cpu.get_numa_node()] = list()
-        self.cpu_per_numa[cpu.get_numa_node()].append(cpu)
+        self.cpu_per_numa[int(cpu.get_numa_node())].append(cpu)
 
     def build_distances(self):
         """For each CPU tuple possible in the cpuset, compute the distance based on Cache Level, siblings and numa distances
