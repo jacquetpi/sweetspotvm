@@ -489,9 +489,13 @@ class CpuSubsetManager(SubsetManager):
         # Test if balance is useful/possible
         if critical_size_unreached:
             min_allocation_for_mutualisation =  math.ceil(allocation_oversub/min_oversubscribed_level)
-            potential_allocation = self.get_available_res_count(numa_id=numa_id) + allocation_oversub
+
+            potential_allocation = allocation_oversub
+            for numa_id in self.numa_id_list: potential_allocation+=self.get_available_res_count(numa_id=numa_id)
+
             if potential_allocation >= min_allocation_for_mutualisation:
-                allocation_oversub_list.extend(self.__get_available_cpus(numa_id=numa_id))
+
+                for numa_id in self.numa_id_list: allocation_oversub_list.extend(self.__get_available_cpus(numa_id=numa_id))
                 for subset in oversub_list: subset.sync_pinning(cpu_list=allocation_oversub_list)
 
 
