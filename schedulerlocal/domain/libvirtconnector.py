@@ -264,8 +264,9 @@ class LibvirtConnector(object):
                 replace('{qcow2}', vm.get_qcow2())
         
         # Dynamically add cpupin related data to xml desc
-        host_config = len(vm.get_cpu_pin()[0])
-        cputune_xml = xmlDomainCputune(xml_as_str=vm_xml, host_config=host_config, cpupin_per_vcpu=vm.get_cpu_pin())
+        if vm.get_cpu_pin() != None:
+            host_config = len(vm.get_cpu_pin()[0])
+            cputune_xml = xmlDomainCputune(xml_as_str=vm_xml, host_config=host_config, cpupin_per_vcpu=vm.get_cpu_pin())
         virDomain = None
         try:
             virDomain = self.conn.defineXML(cputune_xml.convert_to_str_xml())

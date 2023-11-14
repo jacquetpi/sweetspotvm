@@ -474,7 +474,7 @@ class CpuSubsetManager(SubsetManager):
         oversub_list  = list()
         critical_size_unreached  = False
         min_oversubscribed_level = None
-        for numa_id in self.cpuset.get_numa_keys():
+        for numa_id in self.numa_id_list:
             for level, subset in self.collections[numa_id].get_dict().items():
                 if level <= 1.0:
                     continue
