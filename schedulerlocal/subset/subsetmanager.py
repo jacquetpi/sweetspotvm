@@ -384,7 +384,7 @@ class CpuSubsetManager(SubsetManager):
             Return success status of operation
         """
         success = super().deploy(numa_id=numa_id,vm=vm)
-        if success: self.balance_available_resources()
+        if success: self.balance_available_resources(numa_id=numa_id)
         return success
 
     def remove(self, numa_id : int, vm : DomainEntity):
@@ -404,7 +404,7 @@ class CpuSubsetManager(SubsetManager):
             Return success status of operation
         """
         success = super().remove(numa_id=numa_id,vm=vm)
-        if success: self.balance_available_resources()
+        if success: self.balance_available_resources(numa_id=numa_id)
         return success
 
     def try_to_create_subset(self,  numa_id : int, initial_capacity : int, oversubscription : float, subset_type : type = CpuSubset):
@@ -463,8 +463,8 @@ class CpuSubsetManager(SubsetManager):
         subset.add_res(available_cpus_ordered[0])
         return self.try_to_extend_subset(numa_id=numa_id,subset=subset,amount=(amount-1))
 
-    def balance_available_resources(self):
-        """If critical size is not reached on an oversubscribed subset and available resources are present, distribute them
+    def balance_available_resources(self, numa_id : int):
+        """If critical size is not reached on an oversubscribed subset and free resources are present, distribute them
         ----------
         """
         # Retrieve data from context
@@ -474,29 +474,28 @@ class CpuSubsetManager(SubsetManager):
         oversub_list  = list()
         critical_size_unreached  = False
         min_oversubscribed_level = None
-        for numa_id in self.numa_id_list:
-            for level, subset in self.collections[numa_id].get_dict().items():
-                if level <= 1.0:
-                    continue
-                else:
-                    subset.sync_pinning()
-                    capacity_oversub   += subset.get_capacity()
-                    allocation_oversub += subset.get_allocation()
-                    allocation_oversub_list.extend(subset.get_res())
-                    oversub_list.append(subset)
-                    critical_size_unreached = critical_size_unreached or (not subset.get_oversubscription().is_critical_size_reached())
-                    if (min_oversubscribed_level == None) or (level < min_oversubscribed_level): min_oversubscribed_level = level
+        
+        for level, subset in self.collections[numa_id].get_dict().items():
+            if level <= 1.0:
+                continue
+            else:
+                subset.sync_pinning()
+                capacity_oversub   += subset.get_capacity()
+                allocation_oversub += subset.get_allocation()
+                allocation_oversub_list.extend(subset.get_res())
+                oversub_list.append(subset)
+                critical_size_unreached = critical_size_unreached or (not subset.get_oversubscription().is_critical_size_reached())
+                if (min_oversubscribed_level == None) or (level < min_oversubscribed_level): min_oversubscribed_level = level
 
         # Test if balance is useful/possible
         if critical_size_unreached:
             min_allocation_for_mutualisation =  math.ceil(allocation_oversub/min_oversubscribed_level)
 
-            potential_allocation = allocation_oversub
-            for numa_id in self.numa_id_list: potential_allocation+=self.get_available_res_count(numa_id=numa_id)
+            potential_allocation = allocation_oversub + self.get_available_res_count(numa_id=numa_id)
 
             if potential_allocation >= min_allocation_for_mutualisation:
 
-                for numa_id in self.numa_id_list: allocation_oversub_list.extend(self.__get_available_cpus(numa_id=numa_id))
+                allocation_oversub_list.extend(self.__get_available_cpus(numa_id=numa_id))
                 for subset in oversub_list: subset.sync_pinning(cpu_list=allocation_oversub_list)
 
 
