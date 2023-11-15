@@ -1039,7 +1039,7 @@ class SubsetManagerPool(object):
         for subset_manager in self.subset_managers.values():
             success = False
             for numa_id in subset_manager.get_numa_ids():
-                if (subset_manager.has_vm(numa_id=numa_id,vm=vm,ignore_destroyed=True)):
+                if (subset_manager.has_vm(numa_id=numa_id,vm=vm,ignore_destroyed=False)):
                     success = subset_manager.remove(numa_id=numa_id,vm=vm)
                     break # VM can only be on one numa node
 
