@@ -76,7 +76,7 @@ class SubsetManager(object):
                 self.shrink_subset(subset)
         return True
 
-    def has_vm(self, numa_id : int, vm : DomainEntity):
+    def has_vm(self, numa_id : int, vm : DomainEntity, ignore_destroyed : bool = False):
         """Test if a VM is present in a subset
         ----------
 
@@ -92,7 +92,7 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        return self.collections[numa_id].has_vm(vm)
+        return self.collections[numa_id].has_vm(vm=vm,ignore_destroyed=ignore_destroyed)
 
     def get_vm_by_name(self, numa_id : int, name : str):
         """Get a vm by its name, none if not present
@@ -1039,10 +1039,9 @@ class SubsetManagerPool(object):
         for subset_manager in self.subset_managers.values():
             success = False
             for numa_id in subset_manager.get_numa_ids():
-                if (subset_manager.has_vm(numa_id=numa_id,vm=vm)):
+                if (subset_manager.has_vm(numa_id=numa_id,vm=vm,ignore_destroyed=True)):
                     success = subset_manager.remove(numa_id=numa_id,vm=vm)
-                    print('removing', vm.get_name(), success)
-                    break
+                    break # VM can only be on one numa node
 
             if not success: 
                 break
@@ -1050,7 +1049,7 @@ class SubsetManagerPool(object):
         if not success:
             vm.set_being_destroyed(False)
             return (False, 'unable to remove it from all subsets')
-        # second, remove from connector
+        # Second, remove from connector
         if not offline: (success, reason) = self.connector.delete_vm(vm)
         else: (success, reason) = (True, 'offline')
         if success:

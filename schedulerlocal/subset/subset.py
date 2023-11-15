@@ -552,7 +552,7 @@ class SubsetCollection(object):
         for subset in self.subset_dict.values(): res.extend(subset.get_res())
         return res
 
-    def has_vm(self, vm : DomainEntity):
+    def has_vm(self, vm : DomainEntity, ignore_destroyed : bool = False):
         """Test if a VM is present in a subset
         ----------
 
@@ -567,7 +567,7 @@ class SubsetCollection(object):
             Return success status of operation
         """
         for subset in self.subset_dict.values(): 
-            if subset.has_vm(vm): return True
+            if subset.has_vm(vm=vm, ignore_destroyed=ignore_destroyed): return True
         return False
 
     def get_vm_by_name(self, name : str):
