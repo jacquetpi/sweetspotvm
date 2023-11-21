@@ -125,7 +125,7 @@ class DataEndpointLive(DataEndpoint):
 
     def load_global(self, timestamp : int, manager):
         # Use subset explorer
-        return manager.get_current_global_resources_usage()
+        return manager.get_current_resources_usage()
 
     def is_live(self):
         """Return a boolean value based on if values are loaded from a live system

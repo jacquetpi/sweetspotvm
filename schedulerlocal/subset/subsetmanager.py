@@ -22,20 +22,18 @@ class SubsetManager(object):
     """
 
     def __init__(self, **kwargs):
-        req_attributes = ['connector', 'numa_id_list', 'endpoint_pool']
+        req_attributes = ['connector', 'endpoint_pool']
         for req_attribute in req_attributes:
             if req_attribute not in kwargs: raise ValueError('Missing required argument', req_attributes)
             setattr(self, req_attribute, kwargs[req_attribute])
-        self.collections = {numa_id: SubsetCollection() for numa_id in self.numa_id_list}
-
-    def deploy(self, numa_id : int, vm : DomainEntity):
+        self.collection = SubsetCollection()
+    
+    def deploy(self, vm : DomainEntity):
         """Deploy a VM to the appropriate subset
         ----------
 
         ParametersCpu
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         vm : DomainEntity
             The VM to consider
 
@@ -45,23 +43,21 @@ class SubsetManager(object):
             Return success status of operation
         """
         for res_id, (subset_id, res_quantity) in enumerate(self.template_manager.get_subsets_for(vm)):
-            success = self.__deploy_internal(vm=vm,numa_id=numa_id,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
+            success = self.__deploy_internal(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
             if not success: break
         return success
 
-    def __deploy_internal(self, numa_id : int, vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
-        if self.collections[numa_id].contains_subset(subset_id):
-            return self.__try_to_deploy_on_existing_subset(numa_id=numa_id,vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
-        return self.__try_to_deploy_on_new_subset(numa_id=numa_id,vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
+    def __deploy_internal(self, vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
+        if self.collection.contains_subset(subset_id):
+            return self.__try_to_deploy_on_existing_subset(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
+        return self.__try_to_deploy_on_new_subset(vm=vm,res_id=res_id,subset_id=subset_id,res_quantity=res_quantity)
 
-    def remove(self, numa_id : int, vm : DomainEntity):
+    def remove(self, vm : DomainEntity):
         """Remove a VM
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         vm : DomainEntity
             The VM to consider
 
@@ -70,20 +66,18 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        for subset in self.collections[numa_id].get_subsets():
+        for subset in self.collection.get_subsets():
             if subset.has_vm(vm, ignore_destroyed=False): # As we look for a VM being in the destroy process
                 subset.remove_consumer(vm)
                 self.shrink_subset(subset)
         return True
 
-    def has_vm(self, numa_id : int, vm : DomainEntity, ignore_destroyed : bool = False):
+    def has_vm(self, vm : DomainEntity):
         """Test if a VM is present in a subset
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider        
         vm : DomainEntity
             The VM to consider
 
@@ -92,16 +86,14 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        return self.collections[numa_id].has_vm(vm=vm,ignore_destroyed=ignore_destroyed)
+        return self.collection.has_vm(vm)
 
-    def get_vm_by_name(self, numa_id : int, name : str):
+    def get_vm_by_name(self, name : str):
         """Get a vm by its name, none if not present
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider        
         name : str
             The name to search for
 
@@ -110,16 +102,14 @@ class SubsetManager(object):
         vm : DomainEntity
             None if not present
         """
-        return self.collections[numa_id].get_vm_by_name(name)
+        return self.collection.get_vm_by_name(name)
 
-    def __try_to_deploy_on_existing_subset(self, numa_id : int, vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
+    def __try_to_deploy_on_existing_subset(self,  vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
         """Try to deploy a VM to an existing subset by extending it if required 
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider        
         vm : DomainEntity
             The VM to consider
 
@@ -128,7 +118,7 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        targeted_subset = self.collections[numa_id].get_subset(subset_id)
+        targeted_subset = self.collection.get_subset(subset_id)
         # Check if subset has available space
         additional_res_required = targeted_subset.get_additional_res_count_required_for_quantity(vm=vm,quantity=res_quantity)
         if additional_res_required <= 0:
@@ -136,18 +126,16 @@ class SubsetManager(object):
             return targeted_subset.deploy(vm, res_id, res_quantity)
         else:
             # Missing resources on subset, try to allocate more
-            extended = self.try_to_extend_subset(numa_id=numa_id,subset=targeted_subset, amount=additional_res_required)
-            if not extended: return False
+            extended = self.try_to_extend_subset(targeted_subset, additional_res_required)
+            if not extended: return False 
             return targeted_subset.deploy(vm, res_id, res_quantity) 
 
-    def __try_to_deploy_on_new_subset(self, numa_id : int, vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
+    def __try_to_deploy_on_new_subset(self,  vm : DomainEntity, res_id : int, subset_id : float, res_quantity : float):
         """Try to deploy a VM to a new subset
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider        
         vm : DomainEntity
             The VM to consider
 
@@ -156,18 +144,18 @@ class SubsetManager(object):
         success : bool
             Return success status of operation
         """
-        subset = self.try_to_create_subset(numa_id=numa_id,initial_capacity=res_quantity, oversubscription=subset_id)
+        subset = self.try_to_create_subset(initial_capacity=res_quantity, oversubscription=subset_id)
         if subset == None: return False
-        self.collections[numa_id].add_subset(subset_id, subset)
+        self.collection.add_subset(subset_id, subset)
         return subset.deploy(vm, res_id, res_quantity) 
 
-    def try_to_extend_subset(self, numa_id : int, subset : Subset, amount : int):
+    def try_to_extend_subset(self,  subset : Subset, amount : int):
         """Try to extend subset resource by the specified amount. Resource dependant. Must be reimplemented
         ----------
 
         Parameters
         ----------
-        subset : Subset
+        subset : SubSet
             The targeted subset
         amount : int
             Resources requested
@@ -179,7 +167,7 @@ class SubsetManager(object):
         """
         raise NotImplementedError()
 
-    def try_to_create_subset(self, numa_id : int, initial_capacity : int, oversubscription : float):
+    def try_to_create_subset(self,  initial_capacity : int, oversubscription : float):
         """Try to create subset with specified capacity. Resource dependant. Must be reimplemented
         ----------
 
@@ -197,16 +185,11 @@ class SubsetManager(object):
         """
         raise NotImplementedError()
 
-    def shrink(self, numa_id : int):
+    def shrink(self):
         """Reduce subset capacity based on current allocation
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         """
-        for subset in self.collections[numa_id].get_subsets(): self.shrink_subset(subset)
+        for subset in self.collection.get_subsets(): self.shrink_subset(subset)
 
     def shrink_subset(self, subset : Subset = None):
         """Reduce subset capacity based on current allocation. Resource dependant. Must be reimplemented
@@ -219,13 +202,8 @@ class SubsetManager(object):
         """
         raise NotImplementedError()
 
-    def get_current_resources_usage(self, numa_id : int):
+    def get_current_resources_usage(self):
         """Get current usage of physical resources. Resource dependant. Must be reimplemented
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Returns
         -------
@@ -247,28 +225,21 @@ class SubsetManager(object):
         # Update global data: Nothing is done live with it but data are dumped for post analysis
         data = self.endpoint_pool.load_global(timestamp=timestamp, subset_manager=self)
         # Update subset data
-        clean_needed_list = list()
-        for collection in self.collections.values():
-            clean_needed_list.extend(collection.update_monitoring(timestamp=timestamp))
+        clean_needed_list = self.collection.update_monitoring(timestamp=timestamp)
         for subset in clean_needed_list: self.shrink_subset(subset)
 
-    def status(self, numa_id : int):
+    def status(self):
         """Return susbset status as dict
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Returns
         -------
         status : dicts
             Subset status
         """
-        available = self.get_available_res_count(numa_id=numa_id)
+        available = self.get_available_res_count()
         status = {'avail': available, 'subset': dict()}
-        for name, subset in self.collections[numa_id].get_dict().items():
+        for name, subset in self.collection.get_dict().items():
             status['subset'][name] = subset.status()
             status['subset'][name]['vpotential'] = subset.get_oversubscription().get_oversubscribed_quantity(quantity=available, with_new_vm=True)
         return status
@@ -284,14 +255,9 @@ class SubsetManager(object):
         """
         raise NotImplementedError()
 
-    def get_capacity(self, numa_id : int):
-        """Get resource capacity managed by ManagerSubset on numa node. Resource dependant. Must be reimplemented
+    def get_capacity(self):
+        """Get resource capacity managed by ManagerSubset. Resource dependant. Must be reimplemented
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Return
         ----------
@@ -300,14 +266,9 @@ class SubsetManager(object):
         """
         raise NotImplementedError()
 
-    def get_available_res_count(self, numa_id : int):
+    def get_available_res_count(self):
         """Get available resources count on ManagerSubset. Resource dependant. Must be reimplemented
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Return
         ----------
@@ -316,32 +277,17 @@ class SubsetManager(object):
         """
         raise NotImplementedError()
 
-    def get_consumers(self, numa_id : int):
+    def get_consumers(self):
         """Get List of hosted VMs
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Return
         ----------
         vm : list
             List of hosted vm
         """
-        return self.collections[numa_id].get_consumers()
+        return self.collection.get_consumers()
 
-    def get_numa_ids(self):
-        """Get List of numa node ids related to resource 
-        ----------
-
-        Return
-        ----------
-        numa_id_list : list
-            List of numa ids
-        """
-        return self.numa_id_list
 
 class CpuSubsetManager(SubsetManager):
     """
@@ -367,47 +313,17 @@ class CpuSubsetManager(SubsetManager):
         self.template_manager = TemplateOversubscriptionCpu()
         super().__init__(**kwargs)
 
-    def deploy(self, numa_id : int, vm : DomainEntity):
-        """Deploy a VM to the appropriate subset
-        ----------
-
-        ParametersCpu
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        success : bool
-            Return success status of operation
-        """
-        success = super().deploy(numa_id=numa_id,vm=vm)
-        if success: self.balance_available_resources(numa_id=numa_id)
+    def deploy(self, vm : DomainEntity):
+        success = super().deploy(vm)
+        if success: self.balance_available_resources()
         return success
 
-    def remove(self, numa_id : int, vm : DomainEntity):
-        """Remove a VM from the appropriate subset
-        ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
-        vm : DomainEntity
-            The VM to consider
-
-        Returns
-        -------
-        success : bool
-            Return success status of operation
-        """
-        success = super().remove(numa_id=numa_id,vm=vm)
-        if success: self.balance_available_resources(numa_id=numa_id)
+    def remove(self, vm : DomainEntity):
+        success = super().remove(vm)
+        if success: self.balance_available_resources()
         return success
 
-    def try_to_create_subset(self,  numa_id : int, initial_capacity : int, oversubscription : float, subset_type : type = CpuSubset):
+    def try_to_create_subset(self,  initial_capacity : int, oversubscription : float, subset_type : type = CpuSubset):
         """Try to create subset with specified capacity
         ----------
 
@@ -426,22 +342,22 @@ class CpuSubsetManager(SubsetManager):
         if initial_capacity <=0 : raise ValueError('Cannot create a subset with negative capacity', initial_capacity)
         
         # Starting point
-        available_cpus_ordered = self.__get_farthest_available_cpus(numa_id=numa_id)
+        available_cpus_ordered = self.__get_farthest_available_cpus()
 
         if len(available_cpus_ordered) < initial_capacity: return None
         starting_cpu = available_cpus_ordered[0]
         cpu_subset = subset_type(connector=self.connector, cpu_explorer=self.cpu_explorer, endpoint_pool=self.endpoint_pool,\
-            oversubscription=oversubscription, cpu_count=self.cpuset.get_host_count(), numa_id=numa_id, offline=self.offline)
+            oversubscription=oversubscription, cpu_count=self.cpuset.get_host_count(), offline=self.offline)
         cpu_subset.add_res(starting_cpu)
 
         initial_capacity-=1 # One was attributed
         if initial_capacity>0:
-            available_cpus_ordered = self.__get_closest_available_cpus(numa_id=numa_id, subset=cpu_subset) # Recompute based on chosen starting point
+            available_cpus_ordered = self.__get_closest_available_cpus(cpu_subset) # Recompute based on chosen starting point
             for i in range(initial_capacity): cpu_subset.add_res(available_cpus_ordered[i])
 
         return cpu_subset
 
-    def try_to_extend_subset(self, numa_id : int, subset : CpuSubset, amount : int):
+    def try_to_extend_subset(self, subset : CpuSubset, amount : int):
         """Try to extend subset cpu by the specified amount
         ----------
 
@@ -458,13 +374,13 @@ class CpuSubsetManager(SubsetManager):
             Return success status of operation
         """
         if amount<=0: return True
-        available_cpus_ordered = self.__get_closest_available_cpus(numa_id=numa_id,subset=subset)
-        if len(available_cpus_ordered) < amount: return False # should not be possible
+        available_cpus_ordered = self.__get_closest_available_cpus(subset)
+        if len(available_cpus_ordered) < amount: return None
         subset.add_res(available_cpus_ordered[0])
-        return self.try_to_extend_subset(numa_id=numa_id,subset=subset,amount=(amount-1))
+        return self.try_to_extend_subset(subset,amount=(amount-1))
 
-    def balance_available_resources(self, numa_id : int):
-        """If critical size is not reached on an oversubscribed subset and free resources are present, distribute them
+    def balance_available_resources(self):
+        """If critical size is not reached on an oversubscribed subset and available resources are present, distribute them
         ----------
         """
         # Retrieve data from context
@@ -474,12 +390,10 @@ class CpuSubsetManager(SubsetManager):
         oversub_list  = list()
         critical_size_unreached  = False
         min_oversubscribed_level = None
-        
-        for level, subset in self.collections[numa_id].get_dict().items():
+        for level, subset in self.collection.get_dict().items():
             if level <= 1.0:
                 continue
             else:
-                subset.sync_pinning()
                 capacity_oversub   += subset.get_capacity()
                 allocation_oversub += subset.get_allocation()
                 allocation_oversub_list.extend(subset.get_res())
@@ -490,23 +404,18 @@ class CpuSubsetManager(SubsetManager):
         # Test if balance is useful/possible
         if critical_size_unreached:
             min_allocation_for_mutualisation =  math.ceil(allocation_oversub/min_oversubscribed_level)
-
-            potential_allocation = allocation_oversub + self.get_available_res_count(numa_id=numa_id)
-
+            potential_allocation = self.get_available_res_count() + allocation_oversub
             if potential_allocation >= min_allocation_for_mutualisation:
-
-                allocation_oversub_list.extend(self.__get_available_cpus(numa_id=numa_id))
+                allocation_oversub_list.extend(self.__get_available_cpus())
                 for subset in oversub_list: subset.sync_pinning(cpu_list=allocation_oversub_list)
 
 
-    def __get_closest_available_cpus(self, numa_id : int, subset : CpuSubset):
+    def __get_closest_available_cpus(self, subset : CpuSubset):
         """Retrieve the list of available CPUs ordered by their average distance value closest to specified Subset
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         subset : CpuSubset
             The subset requested
 
@@ -515,31 +424,34 @@ class CpuSubsetManager(SubsetManager):
         cpu_list : list
             List of available CPU ordered by their distance
         """
-        cpuid_dict = {cpu.get_cpu_id():cpu for cpu in self.cpuset.get_numa_cpu_list(numa_id=numa_id)}
-        available_list = self.__get_available_cpus(numa_id=numa_id)
+        cpuid_dict = {cpu.get_cpu_id():cpu for cpu in self.cpuset.get_cpu_list()}
+        available_list = self.__get_available_cpus()
         available_cpu_weighted = self.__get_available_cpus_with_weight(from_list=available_list, to_list=subset.get_res(), exclude_max=False)
 
         # Now, we penalize cores that are closer to others subset
         penalty = max(available_cpu_weighted.values()) if available_cpu_weighted else 0
-        for other_subset in self.collections[numa_id].get_subsets():
+        for other_subset in self.collection.get_subsets():
             if other_subset.get_oversubscription_id() == subset.get_oversubscription_id(): continue
 
             other_cpu_weighted = self.__get_available_cpus_with_weight(from_list=available_list, to_list=other_subset.get_res(), exclude_max=False)
             for cpuid in available_cpu_weighted.keys():
                 if other_cpu_weighted[cpuid] < available_cpu_weighted[cpuid]: available_cpu_weighted[cpuid] += penalty
-        
+
+        # If subset is premium, we penalize siblings to current cores
+        if subset.is_premium():
+            penalty = max(available_cpu_weighted.values()) if available_cpu_weighted else 0
+            for cpu in subset.get_res():
+                for sibling in cpu.get_sib_smt():
+                    if sibling in available_cpu_weighted:
+                        available_cpu_weighted[sibling] += penalty
+
         # Reorder distances from the closest one to the farthest one
         return [cpuid_dict[cpuid] for cpuid, v in sorted(available_cpu_weighted.items(), key=lambda item: item[1])]
 
-    def __get_farthest_available_cpus(self, numa_id : int):
+    def __get_farthest_available_cpus(self):
         """When considering subset allocation. One may want to start from the farthest CPU possible
         This getter retrieve available CPUs and order them in a reverse order based on distance from current subsets CPUs
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Returns
         -------
@@ -547,8 +459,8 @@ class CpuSubsetManager(SubsetManager):
             List of available CPU ordered in reverse by their distance
         """
         cpuid_dict = {cpu.get_cpu_id():cpu for cpu in self.cpuset.get_cpu_list()}
-        available_list = self.__get_available_cpus(numa_id=numa_id)
-        allocated_list = self.collections[numa_id].get_res()
+        available_list = self.__get_available_cpus()
+        allocated_list = self.collection.get_res()
         available_cpu_weighted = self.__get_available_cpus_with_weight(from_list=available_list, to_list=allocated_list, exclude_max=False)
         # Reorder distances from the farthest one to the closest one
         return [cpuid_dict[cpuid] for cpuid, v in sorted(available_cpu_weighted.items(), key=lambda item: item[1], reverse=True)]
@@ -594,7 +506,7 @@ class CpuSubsetManager(SubsetManager):
 
         return computed_distances
 
-    def __get_available_cpus(self, numa_id : int):
+    def __get_available_cpus(self):
         """Retrieve the list of CPUs without subset attribution
         ----------
 
@@ -603,9 +515,9 @@ class CpuSubsetManager(SubsetManager):
         cpu_list : list
             list of CPUs without attribution
         """
-        allocated_cpu_list = self.collections[numa_id].get_res()
+        allocated_cpu_list = self.collection.get_res()
         available_cpu_list = list()
-        for cpu in self.cpuset.get_numa_cpu_list(numa_id=numa_id): 
+        for cpu in self.cpuset.get_cpu_list(): 
             if cpu not in allocated_cpu_list: available_cpu_list.append(cpu)
         return available_cpu_list
 
@@ -624,7 +536,7 @@ class CpuSubsetManager(SubsetManager):
         for count in range(unused): subset.remove_res(res_list[last_index-count])
         subset.sync_pinning()
 
-    def get_current_global_resources_usage(self):
+    def get_current_resources_usage(self):
         """Get usage of physical CPU resources
 
         Returns
@@ -645,44 +557,30 @@ class CpuSubsetManager(SubsetManager):
         """
         return 'cpu'
 
-    def get_capacity(self, numa_id : int = None):
-        """Get CPU capacity managed by ManagerSubset on numa node
+    def get_capacity(self):
+        """Get CPU capacity managed by ManagerSubset
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Return
         ----------
         capacity : float
             capacity as float
         """
-        if numa_id == None:
-            return self.cpuset.get_allowed()
-        return self.cpuset.get_numa_allowed(numa_id=numa_id)
+        return self.cpuset.get_allowed()
 
-    def get_available_res_count(self, numa_id : int):
+    def get_available_res_count(self):
         """Get available CPU count on CpuSubsetManager
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Return
         ----------
         count : int
             available cpu count
         """
-        return len(self.__get_available_cpus(numa_id=numa_id))
+        return len(self.__get_available_cpus())
 
     def __str__(self):
-        text = ""
-        for numa_id in self.numa_id_list: text+= 'CPUSubsetManager ' + str(numa_id) + ':\n' +  str(self.collections[numa_id])
-        return text
+        return 'CPUSubsetManager:\n' +  str(self.collection)
 
 class CpuElasticSubsetManager(CpuSubsetManager):
     """
@@ -697,14 +595,12 @@ class CpuElasticSubsetManager(CpuSubsetManager):
         Monitoring session and size adjustement of subset
     """
 
-    def try_to_create_subset(self, numa_id : int, initial_capacity : int, oversubscription : float):
+    def try_to_create_subset(self,  initial_capacity : int, oversubscription : float):
         """Try to create subset with specified capacity
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         initial_capacity : int
             Resources requested (without oversubscription consideration)
         oversubscription : float
@@ -715,12 +611,10 @@ class CpuElasticSubsetManager(CpuSubsetManager):
         subset : Subset
             Return CpuSubset created. None if failed.
         """
-        return super().try_to_create_subset(numa_id=numa_id,initial_capacity=initial_capacity, oversubscription=oversubscription, subset_type=CpuElasticSubset)
+        return super().try_to_create_subset(initial_capacity=initial_capacity, oversubscription=oversubscription, subset_type=CpuElasticSubset)
 
     def __str__(self):
-        text = ""
-        for numa_id in self.numa_id_list: text+= 'CPUElasticSubsetManager ' + str(numa_id) + ':\n' +  str(self.collections[numa_id])
-        return text
+        return 'CPUElasticSubsetManager:\n' +  str(self.collection)
 
 class MemSubsetManager(SubsetManager):
     """
@@ -747,14 +641,12 @@ class MemSubsetManager(SubsetManager):
         self.template_manager = TemplateOversubscriptionMem()
         super().__init__(**kwargs)
 
-    def try_to_create_subset(self, numa_id : int, initial_capacity : int, oversubscription : float):
+    def try_to_create_subset(self,  initial_capacity : int, oversubscription : float):
         """Try to create subset with specified capacity
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         initial_capacity : int
             Resources requested
         oversubscription : float
@@ -766,27 +658,25 @@ class MemSubsetManager(SubsetManager):
             Return MemSubset created. None if failed.
         """
         targeted_inf = 0
-        for subset_tuple in self.collections[numa_id].get_res():
+        for subset_tuple in self.collection.get_res():
             bound_inf, bound_sup = subset_tuple
             if bound_sup > targeted_inf: targeted_inf = bound_sup+1
         new_tuple = (targeted_inf, targeted_inf+initial_capacity)
         
-        if not self.__check_capacity_bound(numa_id=numa_id,bounds=new_tuple): return None
-        if not self.__check_overlap(numa_id=numa_id, new_tuple=new_tuple): return None
+        if not self.__check_capacity_bound(bounds=new_tuple): return None
+        if not self.__check_overlap(new_tuple=new_tuple): return None
 
-        mem_subset = MemSubset(oversubscription=oversubscription, numa_id=numa_id, connector=self.connector, endpoint_pool=self.endpoint_pool, mem_explorer=self.mem_explorer)
+        mem_subset = MemSubset(oversubscription=oversubscription, connector=self.connector, endpoint_pool=self.endpoint_pool, mem_explorer=self.mem_explorer)
 
         mem_subset.add_res(new_tuple)
         return mem_subset
 
-    def try_to_extend_subset(self, numa_id : int, subset : MemSubset, amount : int):
+    def try_to_extend_subset(self,  subset : MemSubset, amount : int):
         """Try to extend subset memory by the specified amount
         ----------
 
         Parameters
         ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
         subset : SubSet
             The targeted subset
         amount : int
@@ -805,17 +695,17 @@ class MemSubsetManager(SubsetManager):
             initial_tuple = None
             new_tuple = (0, amount)
         
-        success = self.__check_capacity_bound(numa_id=numa_id, bounds=new_tuple) 
+        success = self.__check_capacity_bound(bounds=new_tuple) 
         if not success: return False
 
-        success = self.__check_overlap(numa_id=numa_id, new_tuple=new_tuple, initial_tuple=initial_tuple) 
+        success = self.__check_overlap(new_tuple=new_tuple, initial_tuple=initial_tuple) 
         if not success: return False
         
         if initial_tuple != None: subset.remove_res(initial_tuple)
         subset.add_res(new_tuple)
         return True
 
-    def __check_capacity_bound(self, numa_id : int, bounds : tuple):
+    def __check_capacity_bound(self, bounds : tuple):
         """Check if specified extension (as tuple of bounds) verify host capacity
         ----------
 
@@ -829,12 +719,12 @@ class MemSubsetManager(SubsetManager):
         res : boolean
             True if host capacity handles extension. False otherwise.
         """
-        host_capacity = self.memset.get_numa_allowed(numa_id)
+        host_capacity = self.memset.get_allowed()
         if bounds[0] < 0 : return False
         if bounds[1] > host_capacity: return False
         return True
 
-    def __check_overlap(self, numa_id : int, new_tuple : tuple, initial_tuple : tuple = None):
+    def __check_overlap(self, new_tuple : tuple, initial_tuple : tuple = None):
         """Check if specified tuple modification overlaps with others memsubset
         ----------
 
@@ -850,7 +740,7 @@ class MemSubsetManager(SubsetManager):
         res : boolean
             False if overlap check failed, True if succeeded.
         """
-        for other_tuple in self.collections[numa_id].get_res():
+        for other_tuple in self.collection.get_res():
             if other_tuple == initial_tuple: continue
             overlap = max(0, min(new_tuple[1], other_tuple[1]) - max(new_tuple[0], other_tuple[0]))
             if overlap>0: return False
@@ -871,7 +761,7 @@ class MemSubsetManager(SubsetManager):
         subset.remove_res(initial_tuple)
         if unused < initial_tuple[1]: subset.add_res((initial_tuple[0], initial_tuple[1]-unused))
 
-    def get_current_global_resources_usage(self):
+    def get_current_resources_usage(self):
         """Get usage of physical Memory resources
 
         Returns
@@ -892,25 +782,18 @@ class MemSubsetManager(SubsetManager):
         """
         return 'mem'
 
-    def get_capacity(self, numa_id : int = None):
-        """Get Memory capacity managed by ManagerSubset on numa node
+    def get_capacity(self):
+        """Get Memory capacity managed by ManagerSubset
         ----------
-
-        Parameters
-        ----------
-        numa_id : int
-            The numa node (identified by its id) to consider
 
         Return
         ----------
         capacity : float
             capacity as float
         """
-        if numa_id == None:
-            return self.memset.get_allowed()
-        return self.memset.get_numa_allowed(numa_id)
+        return self.memset.get_allowed()
 
-    def get_available_res_count(self, numa_id : int):
+    def get_available_res_count(self):
         """Get available memory quantity on MemSubsetManager
         ----------
 
@@ -920,15 +803,13 @@ class MemSubsetManager(SubsetManager):
             Memory as MB
         """
         allocation = 0
-        for subset_tuple in self.collections[numa_id].get_res():
+        for subset_tuple in self.collection.get_res():
             bound_inf, bound_sup = subset_tuple
             if bound_sup>bound_inf: allocation+= bound_sup - bound_inf
-        return self.get_capacity(numa_id=numa_id) - allocation
+        return self.get_capacity() - allocation
 
     def __str__(self):
-        text = ""
-        for numa_id in self.numa_id_list: text+= 'MemSubsetManager ' + str(numa_id) + ':\n' +  str(self.collections[numa_id])
-        return text
+        return 'MemSubsetManager:\n' +  str(self.collection)
 
 class SubsetManagerPool(object):
     """
@@ -956,8 +837,8 @@ class SubsetManagerPool(object):
             if req_attribute not in kwargs: raise ValueError('Missing required argument', req_attributes)
             setattr(self, req_attribute, kwargs[req_attribute])
         self.subset_managers = {
-            'cpu': CpuSubsetManager(connector=self.connector, endpoint_pool=self.endpoint_pool, numa_id_list=self.cpuset.get_numa_keys(), cpuset=self.cpuset, distance_max=50, offline=self.offline),\
-            'mem': MemSubsetManager(connector=self.connector, endpoint_pool=self.endpoint_pool, numa_id_list=self.memset.get_numa_keys(), memset=self.memset)
+            'cpu': CpuSubsetManager(connector=self.connector, endpoint_pool=self.endpoint_pool, cpuset=self.cpuset, distance_max=50, offline=self.offline),\
+            'mem': MemSubsetManager(connector=self.connector, endpoint_pool=self.endpoint_pool, memset=self.memset)
             }
         self.watch_out_of_schedulers_vm() # Manage pre-installed VMs
 
@@ -992,25 +873,22 @@ class SubsetManagerPool(object):
         tuple : (bool, reason)
             Success as True/False with reason
         """
-        for numa_id in self.subset_managers['cpu'].get_numa_ids():
-            success = True
-            treated = list()
-            for subset_manager in self.subset_managers.values():
-                if subset_manager.deploy(numa_id=numa_id,vm=vm):
-                    treated.append(subset_manager)
-                else:
-                    success = False
-                    reason = 'Not enough space on res ' + subset_manager.get_res_name()
-                    # If one step failed, we have to remove VM from others subset
-                    for subset_manager in treated: subset_manager.remove(numa_id=numa_id, vm=vm)
-                    break # we must retry on other numa node
-            if success: 
-                reason = None
+        treated = list()
+        success = True
+        reason = None
+        for subset_manager in self.subset_managers.values():
+            if not subset_manager.deploy(vm): 
+                success = False
+                reason = 'Not enough space on res ' + subset_manager.get_res_name()
                 break
-
+            treated.append(subset_manager)
         # If we succeed, the DOA DomainEntity was adapted according to the need of all subsetsManager. We apply changes using the connector
         if success and not vm.is_deployed() and not offline:
             success, reason = self.connector.create_vm(vm)
+        if success: return (success, reason)
+        # If one step failed, we have to remove VM from others subset
+        for subset_manager in treated: 
+            subset_manager.remove(vm)
         return (success, reason)
 
     def remove(self, vm : DomainEntity = None, name : str = None, offline : bool = False):
@@ -1036,19 +914,14 @@ class SubsetManagerPool(object):
         success = True
         # First, remove from subsets
         for subset_manager in self.subset_managers.values():
-            success = False
-            for numa_id in subset_manager.get_numa_ids():
-                if (subset_manager.has_vm(numa_id=numa_id,vm=vm,ignore_destroyed=False)):
-                    success = subset_manager.remove(numa_id=numa_id,vm=vm)
-                    break # VM can only be on one numa node
-
-            if not success: 
+            if not subset_manager.remove(vm): 
+                success = False
                 break
             treated.append(subset_manager)
         if not success:
             vm.set_being_destroyed(False)
             return (False, 'unable to remove it from all subsets')
-        # Second, remove from connector
+        # second, remove from connector
         if not offline: (success, reason) = self.connector.delete_vm(vm)
         else: (success, reason) = (True, 'offline')
         if success:
@@ -1080,10 +953,10 @@ class SubsetManagerPool(object):
         success : bool
             Return if vm was found
         """
+        has_vm = 0
         for subset_manager in self.subset_managers.values():
-            for numa_id in subset_manager.get_numa_ids():
-                if(subset_manager.has_vm(numa_id=numa_id,vm=vm_copy)):
-                    return True
+            if subset_manager.has_vm(vm_copy): has_vm+=1
+        if has_vm >0: return True
         return False
 
     def get_vm_by_name(self, name : str):
@@ -1104,17 +977,11 @@ class SubsetManagerPool(object):
         being_destroyed = False
         found = None
         for subset_manager in self.subset_managers.values():
-
-            vm = None
-            for numa_id in subset_manager.get_numa_ids():
-                vm = subset_manager.get_vm_by_name(numa_id=numa_id,name=name)
-                if vm != None: break
-
+            vm = subset_manager.get_vm_by_name(name)
             if vm != None: 
                 has_vm+=1
                 being_destroyed = being_destroyed or vm.is_being_destroyed()
                 found = vm
-
         if (has_vm != len(self.subset_managers)) and (has_vm != 0):
             based_message = 'Warning: vm ' + name + ' unequally present in subsets'
             if not being_destroyed: print(based_message)
@@ -1132,9 +999,7 @@ class SubsetManagerPool(object):
         """
         status = dict()
         for name, manager in self.subset_managers.items():
-            status[name] = dict()
-            for numa_id in manager.get_numa_ids():
-                status[name][numa_id] =  manager.status(numa_id=numa_id)
+            status[name] =  manager.status()
         return status
 
     def list_vm(self):
@@ -1146,10 +1011,7 @@ class SubsetManagerPool(object):
         vm_list : list
             List of hosted vm
         """
-        consumers = list()
-        for numa_id in self.subset_managers['cpu'].get_numa_ids():
-            consumers.extend[self.subset_managers['cpu'].get_consumers(numa_id=numa_id)]
-        return consumers
+        return self.subset_managers['cpu'].get_consumers()
 
     def __str__(self):
         return ''.join([str(subset_manager) + '\n' for subset_manager in self.subset_managers.values()])

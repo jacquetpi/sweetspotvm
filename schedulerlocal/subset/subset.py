@@ -40,7 +40,7 @@ class Subset(object):
     def __init__(self, **kwargs):
         self.oversubscription = SubsetOversubscriptionStatic(subset=self, ratio=kwargs['oversubscription'])
         self.endpoint_pool = kwargs['endpoint_pool']
-        opt_attributes = ['res_list', 'consumer_list', 'consumer_dict', 'numa_id']
+        opt_attributes = ['res_list', 'consumer_list', 'consumer_dict']
         for opt_attribute in opt_attributes:
             opt_val = kwargs[opt_attribute] if opt_attribute in kwargs else None
             setattr(self, opt_attribute, opt_val)
@@ -57,7 +57,7 @@ class Subset(object):
         id : float
             Oversubscription as ID
         """
-        return str(self.numa_id) + ":" + str(self.oversubscription.get_id())
+        return self.oversubscription.get_id()
 
     def add_res(self, res):
         """Add a resource to subset
@@ -552,7 +552,7 @@ class SubsetCollection(object):
         for subset in self.subset_dict.values(): res.extend(subset.get_res())
         return res
 
-    def has_vm(self, vm : DomainEntity, ignore_destroyed : bool = False):
+    def has_vm(self, vm : DomainEntity):
         """Test if a VM is present in a subset
         ----------
 
@@ -567,7 +567,7 @@ class SubsetCollection(object):
             Return success status of operation
         """
         for subset in self.subset_dict.values(): 
-            if subset.has_vm(vm=vm, ignore_destroyed=ignore_destroyed): return True
+            if subset.has_vm(vm): return True
         return False
 
     def get_vm_by_name(self, name : str):
@@ -654,6 +654,17 @@ class CpuSubset(Subset):
             resource name
         """
         return 'cpu'
+
+    def is_premium(self):
+        """Get subset id
+        ----------
+
+        Return
+        ----------
+        is_premium : bool
+            True if premium
+        """
+        return self.oversubscription.get_id() == 1.0
 
     def get_vm_allocation(self, vm : DomainEntity):
         """Return CPU allocation of a given VM without oversubscription consideration

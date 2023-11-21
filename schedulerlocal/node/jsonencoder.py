@@ -4,7 +4,7 @@ from schedulerlocal.node.cpuset import ServerCpuSet, ServerCpu
 
 class ServerCpuSetEncoder(JSONEncoder):
     """
-    Class to specify how to convert ServerCpuSet to JSON
+    Class to specify on to convert ServerCpuSet to JSON
     ...
 
     Public MethodsServerCpuSet
@@ -24,7 +24,6 @@ class ServerCpuSetEncoder(JSONEncoder):
             return
         as_dict = dict(o.__dict__)
         as_dict['cpu_list'] = [self.convert_cpu_to_dict(cpu) for cpu in o.__dict__['cpu_list']]
-        del as_dict['cpu_per_numa'] # will be rebuild from cpu_list
         return as_dict
 
     @staticmethod
@@ -35,7 +34,7 @@ class ServerCpuSetEncoder(JSONEncoder):
 
 class ServerMemorySetEncoder(JSONEncoder):
     """
-    Class to specify how to convert MemoryCpuSet to JSON
+    Class to specify on to convert MemoryCpuSet to JSON
     ...
 
     Public MethodsServerCpuSet
@@ -58,7 +57,7 @@ class ServerMemorySetEncoder(JSONEncoder):
 
 class SubsetEncoder(JSONEncoder):
     """
-    Class to specify how to convert Subset to JSON
+    Class to specify on to convert Subset to JSON
     ...
 
     Public MethodsServerCpuSet
@@ -90,7 +89,7 @@ class SubsetEncoder(JSONEncoder):
 
 class GlobalEncoder(JSONEncoder):
     """
-    Class to specify how to convert ServerCpuSet to JSON
+    Class to specify on to convert ServerCpuSet to JSON
     ...
 
     Public MethodsServerCpuSet
@@ -115,9 +114,5 @@ class GlobalEncoder(JSONEncoder):
             return SubsetEncoder(*args, **kwargs).default(o)
         elif type(o) is dict:
             return dict(o.__dict__)
-        elif type(o) is ServerCpu:
-            cpu_dict= dict(o.__dict__)
-            del cpu_dict['cpu_time']
-            return cpu_dict
         else:
             raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
