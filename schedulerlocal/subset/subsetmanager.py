@@ -438,14 +438,6 @@ class CpuSubsetManager(SubsetManager):
             for cpuid in available_cpu_weighted.keys():
                 if other_cpu_weighted[cpuid] < available_cpu_weighted[cpuid]: available_cpu_weighted[cpuid] += penalty
 
-        # If subset is premium, we penalize siblings to current cores
-        if subset.is_premium():
-            penalty = max(available_cpu_weighted.values()) if available_cpu_weighted else 0
-            for cpu in subset.get_res():
-                for sibling in cpu.get_sib_smt():
-                    if sibling in available_cpu_weighted:
-                        available_cpu_weighted[sibling] += penalty
-
         # Reorder distances from the closest one to the farthest one
         return [cpuid_dict[cpuid] for cpuid, v in sorted(available_cpu_weighted.items(), key=lambda item: item[1])]
 
