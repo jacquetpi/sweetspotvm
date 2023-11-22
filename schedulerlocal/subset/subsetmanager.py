@@ -394,6 +394,7 @@ class CpuSubsetManager(SubsetManager):
             if level <= 1.0:
                 continue
             else:
+                subset.sync_pinning()
                 capacity_oversub   += subset.get_capacity()
                 allocation_oversub += subset.get_allocation()
                 allocation_oversub_list.extend(subset.get_res())
