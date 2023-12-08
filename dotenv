@@ -24,6 +24,7 @@ QEMU_MACHINE="pc-q35-6.2"
 #---- Topology
 TOPO_EXCLUDE = "" # as list of cpuid to exclude (e.g. 0,1 )
 #--- Oversubscription
+OVSB_TEMPLATE="1.0,1.5,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6" # Oversubscription to apply to each vCPU index (here, 1.0 to vCPU0, 1.5 to vCPU 1 etc.)
 OVSB_CRITICAL_SIZE=6 # oversub will not begin before this number of VM is reached
 #--- InfluxDB (not implemented yet)
 INFLUXDB_URL="http://localhost:8086"
