@@ -1,7 +1,7 @@
 SweetSpotVM is a prototype showing how vCPUs of a given VM can be oversubscribed to different levels.
 It is composed of a local scheduler, deployed on each server, which manage deployments requests and adapt the pinning accordingly.
 
-Theserver must be equipped with QEMU/KVM and libvirt for online execution
+The server must be equipped with QEMU/KVM and libvirt for online execution
 
 ## Setup
 
@@ -25,12 +25,12 @@ The workload trace is an heavy file. We provide an example [hosted separately](h
 - Offline execution 
 ```bash
 source venv/bin/activate
-python3 -m schedulerlocal --topology=debug/topology_EPYC-7662-exp.json --load=debug/monitoring-EPYC7662-ocall.csv --debug=1
+python3 -m schedulerlocal --topology=debug/topology_EPYC-7662-exp.json --load=debug/monitoring-EPYC7662-oc3.csv --debug=1
 ```
 > Load an EPYC-7662 platform jointly with a corresponding workload  
 > The debug=1 generates a new ```debug/monitoring.csv``` trace based on re-computation. 
 
-After that, executing cells sequentially in notebook ```demo.ipynb```  allows to re-generate figure 3 of the paper using this trace
+After that, executing cells sequentially in notebook ```demo.ipynb```  allows to re-generate figure 5 of the paper using this trace
 
 ## Local scheduler - Online mode
 
