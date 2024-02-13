@@ -71,8 +71,8 @@ class TemplateOversubscriptionCpu(TemplateOversubscription):
             List of of subsets id. [(subset for core0 : quantity) , (subset for core1 : quantity) ...]
         """
         starting_at = 0
-        if vm.get_cpu() <= 4:
-            starting_at = 1
+        if vm.get_cpu() < 4:
+            starting_at = 2
         return [(self.template[cpu],self.get_quantity(vm=vm)) for cpu in range(starting_at, vm.get_cpu()+starting_at)]
 
     def get_quantity(self, vm : DomainEntity):
