@@ -38,7 +38,7 @@ After that, executing cells sequentially in notebook ```demo.ipynb```  allows to
 ## Local scheduler - Online mode
 
 Instance on each server  
-Deployed by default on 8099 port. Can be changed through the ```.env``` file
+Deployed by default on 8100 port. Can be changed through the ```.env``` file
 ```bash
 python3 -m schedulerlocal --help
 ```
@@ -54,7 +54,7 @@ Requests are made in a REST fashion way
 
 - On a live setting : Order the creation of a vm
 ```bash
-curl 'http://127.0.0.1:8099/deploy?name=example&cpu=2&mem=2&qcow2=/var/lib/libvirt/images/hello.qcow2'
+curl 'http://127.0.0.1:8100/deploy?name=example&cpu=2&mem=2&qcow2=/var/lib/libvirt/images/hello.qcow2'
 ```
 > name: VM name (must be unique)  
 > cpu: vCPU requested  
@@ -63,5 +63,5 @@ curl 'http://127.0.0.1:8099/deploy?name=example&cpu=2&mem=2&qcow2=/var/lib/libvi
 
 - Online execution : Order the deletion of a vm
 ```bash
-curl 'http://127.0.0.1:8099/remove?name=example'
+curl 'http://127.0.0.1:8100/remove?name=example'
 ```
