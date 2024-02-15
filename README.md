@@ -9,6 +9,7 @@ The server must be equipped with QEMU/KVM and libvirt for online execution
 apt-get update && apt-get install -y git python3 python3.venv
 git clone https://github.com/jacquetpi/sweetspotvm
 cd sweetspotvm/
+cp dotenv .env
 python3 -m venv venv
 source venv/bin/activate
 python3 -m pip install -r requirements.txt
