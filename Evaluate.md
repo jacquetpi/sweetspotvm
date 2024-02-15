@@ -11,7 +11,7 @@ You will need two Qcow2 images ready to be used
 ## Evaluate performances on a SweetSpotVM setup
 
 Modify your ```.env ``` to apply following template: ```OVSB_TEMPLATE="1.0,1.0,3.0"```
-> This template does not oversubscribe first two vCPUs while proposing others to a 3:1 ratio
+> This template does not oversubscribe the first two vCPUs while proposing others to a 3:1 ratio
 
 Launch the local scheduler
 ```
