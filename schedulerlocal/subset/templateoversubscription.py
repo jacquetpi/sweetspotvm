@@ -71,9 +71,7 @@ class TemplateOversubscriptionCpu(TemplateOversubscription):
             List of of subsets id. [(subset for core0 : quantity) , (subset for core1 : quantity) ...]
         """
         starting_at = 0
-        if vm.get_cpu() < 4:
-            starting_at = 2
-        return [(self.template[cpu],self.get_quantity(vm=vm)) for cpu in range(starting_at, vm.get_cpu()+starting_at)]
+        return [(self.get_from_template(cpuid=cpu),self.get_quantity(vm=vm)) for cpu in range(starting_at, vm.get_cpu()+starting_at)]
 
     def get_quantity(self, vm : DomainEntity):
         """For a given VM return resource quantity request
@@ -90,6 +88,24 @@ class TemplateOversubscriptionCpu(TemplateOversubscription):
             Resource quantity
         """
         return 1 # Oversubscription is on a per vcpu baseline, no matter what the vm is requesting
+
+    def get_from_template(self, cpuid : int):
+        """For a given cpuid, return oversubscription from template
+        ----------
+
+        Parameters
+        ----------
+        cpuid : int
+            The CPUID to consider
+
+        Returns
+        -------
+        resource : float
+            Oversubscription ratio
+        """
+        if cpuid >= len(self.template):
+            return self.template[-1]
+        return self.template[cpuid]
 
 class TemplateOversubscriptionMem(TemplateOversubscription):
     """
