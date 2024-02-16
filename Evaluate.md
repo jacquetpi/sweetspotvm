@@ -32,16 +32,16 @@ Inside VM1, generate some CPU activity (all cores will be used at 50%)
 (vm1) stress-ng --cpu 0 -l 50
 ```
 
-Inside VM2, compare performances between the first and the last core
+Inside VM2, compare performances between the first and the last core using 7zip
 ```
 (vm2) sudo apt-get install -y p7zip-full
-(vm2) taskset --cpu 0 7z b -mmt1
-(vm2) taskset --cpu 5 7z b -mmt1
+(vm2) taskset --cpu 0 7z b 3 -mmt1
+(vm2) taskset --cpu 5 7z b 3 -mmt1
 ```
-Note the average ```MIPS``` values obtained from both Compressing and Decompressing step
-> Higher performance is shown with an higher MIPS (million instructions per second)
+> Higher performance is shown with an higher ```MIPS``` (million instructions per second)
+
+Note the average (Avr)  ```MIPS``` values obtained from both Compressing and Decompressing steps
 
 ## Expected results
 
 - Under the SweetSpotVM context, the CPU0 should expose better performances than the CPU5 (we observed a delta of 5-10% on a i7-1185G7 platform)
-
