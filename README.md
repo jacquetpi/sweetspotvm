@@ -15,7 +15,7 @@ source venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-Configuration is being made by the ```.env``` file  
+Configuration is being made using the ```.env``` file  
 Oversubscription template can be changed using this file
 
 ## Local scheduler - Offline mode
