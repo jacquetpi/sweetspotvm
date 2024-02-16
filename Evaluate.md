@@ -1,7 +1,8 @@
 SweetSpotVM principle relies on host oversubscription to exposes cores having different performance capabilities.  
 If you wish to evaluate this claim, we propose a minimal experiment composed of two VMs. 
 
-> This test is designed for laptops equipped with a 4 physical cores processor (8 with HT)  
+> This test is designed for laptops equipped with a 4 physical cores processor (8 with hyperthreading)  
+> Use the powersave mode of your laptop to get more consistent performances: ```# echo powersave | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor```  
 > Do **NOT** use a host with Performance/Energy cores (as these architectures already expose cores with different performances)
 
 ## Requirements
@@ -25,21 +26,22 @@ Setup your two VMs (adapt the Qcow2 location)
 (host) curl 'http://127.0.0.1:8100/deploy?name=vm2&cpu=6&mem=2&qcow2=/var/lib/libvirt/images/vm2.qcow2'
 ```
 
-Inside VM1, generate some CPU activity
+Inside VM1, generate some CPU activity (all cores will be used at 50%)
 ```
 (vm1) sudo apt-get install -y stress-ng
-(vm1) stress-ng --cpu 0
+(vm1) stress-ng --cpu 0 -l 50
 ```
 
-Inside VM2, compare performances between first and last core.
+Inside VM2, compare performances between the first and the last core
 ```
-(vm2) sudo apt-get install -y stress-ng
-(vm2) taskset --cpu 0 stress-ng --cpu 1 -t 60s --metrics-brief
-(vm2) taskset --cpu 5 stress-ng --cpu 1 -t 60s --metrics-brief
+(vm2) sudo apt-get install -y p7zip-full
+(vm2) taskset --cpu 0 7z b -mmt1
+(vm2) taskset --cpu 5 7z b -mmt1
 ```
-Note the ```bogo ops/s``` value obtained
-> We recommend doing 3 to 5 runs
+Note the average ```MIPS``` values obtained from both Compressing and Decompressing step
+> Higher performance is shown with an higher MIPS (million instructions per second)
 
 ## Expected results
 
-- Under the SweetSpotVM context, the CPU0 should expose better performances than CPU5
+- Under the SweetSpotVM context, the CPU0 should expose better performances than the CPU5 (we observed a delta of 5-10% on a i7-1185G7 platform)
+
