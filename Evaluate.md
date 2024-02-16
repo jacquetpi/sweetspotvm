@@ -1,4 +1,4 @@
-SweetSpotVM principle relies on host oversubscription to exposes cores having different performance capabilities.  
+SweetSpotVM principle relies on host cpu oversubscription to exposes vCPUs having different performance capabilities.  
 If you wish to evaluate this claim, we propose a minimal experiment composed of two VMs. 
 
 > This test is designed for laptops equipped with a 4 physical cores processor (8 with hyperthreading)  
