@@ -35,8 +35,8 @@ Inside VM1, generate some CPU activity (all cores will be used at 50%)
 Inside VM2, compare performances between the first and the last core using 7zip
 ```
 (vm2) sudo apt-get install -y p7zip-full
-(vm2) taskset --cpu 0 7z b 3 -mmt1
-(vm2) taskset --cpu 5 7z b 3 -mmt1
+(vm2) taskset --cpu 0 7z b 10 -mmt1
+(vm2) taskset --cpu 5 7z b 10 -mmt1
 ```
 > Higher performance is shown with an higher ```MIPS``` (million instructions per second)
 
