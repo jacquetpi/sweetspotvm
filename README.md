@@ -3,6 +3,8 @@ It is composed of a local scheduler, deployed on each server, which manage deplo
 
 The server must be equipped with QEMU/KVM and libvirt for online execution
 
+Details are available in the [associated paper](https://hal.science/hal-04454043v1/document)
+
 ## Setup
 
 ```bash
